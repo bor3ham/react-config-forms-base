@@ -19,32 +19,33 @@ class ConfigForm extends React.Component {
     }
     // parse initial config
     let parsedConfig = this.parseConfig(this.props.config || '')
-    // if no result set, load initial values
-    let values = this.props.result
-    if (!values) {
-      if (parsedConfig.config && Array.isArray(parsedConfig.fields)) {
-        parsedConfig.fields.map((field) => {
-          if (typeof values[field.key] === 'undefined') {
-            if (Array.isArray(field.initial)) {
-              values[field.key] = field.initial
-            }
-            else if (typeof field['initial'] === 'string') {
-              values[field.key] = StringTemplate(field.initial, context)
-            }
-          }
-        })
-      }
-      else {
-        values = {}
-      }
-    }
     this.state = {
       ...this.state,
-      style: '',
-      values: values,
       context: context,
       ...parsedConfig,
     };
+  }
+  componentDidMount() {
+    this.addInitialValues()
+  }
+  addInitialValues() {
+    if (this.props.onChange) {
+      let initial = {
+        ...this.props.value,
+      }
+      if (this.state.config && Array.isArray(this.state.config.fields)) {
+        this.state.config.fields.map((field) => {
+          if (field.key in initial === false) {
+            let initialValue = field.initial
+            if (typeof initialValue === 'string') {
+              initialValue = StringTemplate(initialValue, this.state.context)
+            }
+            initial[field.key] = initialValue
+          }
+        })
+      }
+      this.props.onChange(initial)
+    }
   }
 
   parseConfig(config) {
@@ -71,7 +72,9 @@ class ConfigForm extends React.Component {
     return result;
   }
   setConfig(config) {
-    this.setState(this.parseConfig(config))
+    this.setState(this.parseConfig(config), () => {
+      this.addInitialValues()
+    })
   }
 
 
@@ -80,17 +83,13 @@ class ConfigForm extends React.Component {
       console.warn('Trying to change uneditable form')
       return
     }
-    this.setState((state) => {
-      state.values = {
-        ...state.values,
-      }
-      state.values[key] = value
-      return state
-    }, () => {
-      if (this.props.onChange) {
-        this.props.onChange(this.state.values);
-      }
-    });
+    let newValue = {
+      ...this.props.value,
+    }
+    newValue[key] = value
+    if (this.props.onChange) {
+      this.props.onChange(newValue);
+    }
   }
 
   renderField(field, key, layoutSettings) {
@@ -104,7 +103,7 @@ class ConfigForm extends React.Component {
       ...field,
       key: key,
       fieldKey: field.key,
-      value: this.state.values[field.key],
+      value: this.props.value[field.key],
       onChange: this.handleValueChange,
     }
     return React.createElement(renderer, fieldProps)
